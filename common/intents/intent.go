@@ -3,9 +3,9 @@ package intents
 
 import (
 	"io"
-	"strings"
 	"sync"
 
+	"github.com/mongodb/mongo-tools/common"
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -262,13 +262,7 @@ func (manager *Manager) PutWithNamespace(ns string, intent *Intent) {
 	if intent == nil {
 		panic("cannot insert nil *Intent into IntentManager")
 	}
-	var db string
-	i := strings.Index(ns, ".")
-	if i != -1 {
-		db = ns[:i]
-	} else {
-		db = ns
-	}
+	db, _ := common.SplitNamespace(ns)
 
 	// bucket special-case collections
 	if intent.IsOplog() {

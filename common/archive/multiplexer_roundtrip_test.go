@@ -43,6 +43,10 @@ type testDoc struct {
 	Baz string
 }
 
+type nullNotifier struct{}
+
+func (*nullNotifier) Notify() {}
+
 type closingBuffer struct {
 	bytes.Buffer
 }
@@ -57,7 +61,7 @@ func TestBasicMux(t *testing.T) {
 	Convey("with 10000 docs in each of five collections", t, func() {
 		buf := &closingBuffer{bytes.Buffer{}}
 
-		mux := NewMultiplexer(buf)
+		mux := NewMultiplexer(buf, new(nullNotifier))
 		muxIns := map[string]*MuxIn{}
 
 		inChecksum := map[string]hash.Hash{}
@@ -167,7 +171,7 @@ func TestParallelMux(t *testing.T) {
 		readPipe, writePipe, err := os.Pipe()
 		So(err, ShouldBeNil)
 
-		mux := NewMultiplexer(writePipe)
+		mux := NewMultiplexer(writePipe, new(nullNotifier))
 		muxIns := map[string]*MuxIn{}
 
 		demux := &Demultiplexer{In: readPipe}

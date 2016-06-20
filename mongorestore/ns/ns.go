@@ -177,7 +177,9 @@ func NewRenamer(fromSlice, toSlice []string) (r *Renamer, err error) {
 		return
 	}
 	r = new(Renamer)
-	for i, from := range fromSlice {
+	for i := len(fromSlice) - 1; i >= 0; i-- {
+		// reversed for replacement precedence
+		from := fromSlice[i]
 		to := toSlice[i]
 		err = validateReplacement(from, to)
 		if err != nil {
@@ -188,10 +190,8 @@ func NewRenamer(fromSlice, toSlice []string) (r *Renamer, err error) {
 			err = fmt.Errorf("Invalid replacement from '%s' to '%s': %s", from, to, e)
 			return
 		}
-		// Prepend the new matcher/replacer to the slices
-		// This replacement takes precedence over the previous ones
-		r.matchers = append([]*regexp.Regexp{matcher}, r.matchers...)
-		r.replacers = append([]string{replacer}, r.replacers...)
+		r.matchers = append(r.matchers, matcher)
+		r.replacers = append(r.replacers, replacer)
 	}
 	return
 }

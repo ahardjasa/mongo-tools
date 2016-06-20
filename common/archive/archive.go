@@ -1,9 +1,6 @@
 package archive
 
-import (
-	"io"
-	"strings"
-)
+import "io"
 
 // NamespaceHeader is a data structure that, as BSON, is found in archives where it indicates
 // that either the subsequent stream of BSON belongs to this new namespace, or that the
@@ -55,12 +52,4 @@ type Reader struct {
 	In      io.ReadCloser
 	Demux   *Demultiplexer
 	Prelude *Prelude
-}
-
-func splitNamespace(ns string) (string, string) {
-	i := strings.Index(ns, ".")
-	if i != -1 {
-		return ns[:i], ns[i+1:]
-	}
-	return "", ns
 }

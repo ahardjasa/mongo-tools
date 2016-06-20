@@ -3,16 +3,18 @@ package mongorestore
 import (
 	"compress/gzip"
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/archive"
-	"github.com/mongodb/mongo-tools/common/intents"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+
+	"github.com/mongodb/mongo-tools/common"
+	"github.com/mongodb/mongo-tools/common/archive"
+	"github.com/mongodb/mongo-tools/common/intents"
+	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/util"
 )
 
 // FileType describes the various types of restore documents.
@@ -335,7 +337,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 				filepath.Join(dir.Name(), entry.Name()))
 		} else {
 			collection, fileType := restore.getInfoFromFilename(entry.Name())
-			nsFrom := db + "." + collection
+			sourceNS := db + "." + collection
 			switch fileType {
 			case BSONFileType:
 				var skip bool
@@ -364,19 +366,19 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 					skip = true
 				}
 
-				if !restore.includer.Has(db + "." + collection) {
+				if !restore.includer.Has(sourceNS) {
 					log.Logf(log.DebugLow, "skipping restoring %v.%v, it is not included", db, collection)
 					skip = true
 				}
-				if restore.excluder.Has(db + "." + collection) {
+				if restore.excluder.Has(sourceNS) {
 					log.Logf(log.DebugLow, "skipping restoring %v.%v, it is excluded", db, collection)
 					skip = true
 				}
-				nsTo := restore.renamer.Get(db + "." + collection)
-				rnDB, rnC := splitNS(nsTo)
+				destNS := restore.renamer.Get(sourceNS)
+				destDB, destC := common.SplitNamespace(destNS)
 				intent := &intents.Intent{
-					DB:   rnDB,
-					C:    rnC,
+					DB:   destDB,
+					C:    destC,
 					Size: entry.Size(),
 				}
 				if restore.InputOptions.Archive != "" {
@@ -388,16 +390,16 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 					if skip {
 						// adding the DemuxOut to the demux, but not adding the intent to the manager
 						mutedOut := &archive.MutedCollection{Intent: intent, Demux: restore.archive.Demux}
-						restore.archive.Demux.Open(nsFrom, mutedOut)
+						restore.archive.Demux.Open(sourceNS, mutedOut)
 						continue
 					}
 					if intent.IsSpecialCollection() {
 						specialCollectionCache := archive.NewSpecialCollectionCache(intent, restore.archive.Demux)
 						intent.BSONFile = specialCollectionCache
-						restore.archive.Demux.Open(nsFrom, specialCollectionCache)
+						restore.archive.Demux.Open(sourceNS, specialCollectionCache)
 					} else {
 						intent.BSONFile = &archive.RegularCollectionReceiver{
-							Origin: nsFrom,
+							Origin: sourceNS,
 							Intent: intent,
 							Demux:  restore.archive.Demux,
 						}
@@ -409,21 +411,21 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 					intent.Location = entry.Path()
 					intent.BSONFile = &realBSONFile{path: entry.Path(), intent: intent, gzip: restore.InputOptions.Gzip}
 				}
-				log.Logf(log.Info, "found collection %v bson to restore to %v", nsFrom, nsTo)
-				restore.manager.PutWithNamespace(nsFrom, intent)
+				log.Logf(log.Info, "found collection %v bson to restore to %v", sourceNS, destNS)
+				restore.manager.PutWithNamespace(sourceNS, intent)
 			case MetadataFileType:
-				if !restore.includer.Has(nsFrom) {
+				if !restore.includer.Has(sourceNS) {
 					log.Logf(log.DebugLow, "skipping restoring %v.%v metadata, it is not included", db, collection)
 					continue
 				}
-				if restore.excluder.Has(nsFrom) {
+				if restore.excluder.Has(sourceNS) {
 					log.Logf(log.DebugLow, "skipping restoring %v.%v metadata, it is excluded", db, collection)
 					continue
 				}
 
 				usesMetadataFiles = true
-				nsTo := restore.renamer.Get(nsFrom)
-				rnDB, rnC := splitNS(nsTo)
+				destNS := restore.renamer.Get(sourceNS)
+				rnDB, rnC := common.SplitNamespace(destNS)
 				intent := &intents.Intent{
 					DB: rnDB,
 					C:  rnC,
@@ -435,13 +437,13 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, dir archive.DirLike) 
 					} else {
 						intent.MetadataLocation = fmt.Sprintf("archive '%v'", restore.InputOptions.Archive)
 					}
-					intent.MetadataFile = &archive.MetadataPreludeFile{Origin: nsFrom, Intent: intent, Prelude: restore.archive.Prelude}
+					intent.MetadataFile = &archive.MetadataPreludeFile{Origin: sourceNS, Intent: intent, Prelude: restore.archive.Prelude}
 				} else {
 					intent.MetadataLocation = entry.Path()
 					intent.MetadataFile = &realMetadataFile{path: entry.Path(), intent: intent, gzip: restore.InputOptions.Gzip}
 				}
-				log.Logf(log.Info, "found collection metadata from %v to restore to %v", nsFrom, nsTo)
-				restore.manager.PutWithNamespace(nsFrom, intent)
+				log.Logf(log.Info, "found collection metadata from %v to restore to %v", sourceNS, destNS)
+				restore.manager.PutWithNamespace(sourceNS, intent)
 			default:
 				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`,
 					entry.Path())

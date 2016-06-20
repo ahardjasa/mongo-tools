@@ -2,6 +2,8 @@ package mongorestore
 
 import (
 	"fmt"
+
+	"github.com/mongodb/mongo-tools/common"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/intents"
@@ -10,7 +12,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"strings"
 )
 
 // Specially treated restore collection types.
@@ -126,16 +127,8 @@ func (restore *MongoRestore) LoadIndexesFromBSON() error {
 	return nil
 }
 
-func splitNS(ns string) (string, string) {
-	i := strings.Index(ns, ".")
-	if i > 0 && i < len(ns) {
-		return ns[:i], ns[i+1:]
-	}
-	return ns, ""
-}
-
 func stripDBFromNS(ns string) string {
-	_, c := splitNS(ns)
+	_, c := common.SplitNamespace(ns)
 	return c
 }
 
