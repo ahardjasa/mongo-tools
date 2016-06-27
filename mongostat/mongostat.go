@@ -109,7 +109,7 @@ type AsyncClusterMonitor struct {
 	LastStatLines map[string]*StatLine
 
 	// Mutex to protect access to LastStatLines
-	mapLock sync.Mutex
+	mapLock sync.RWMutex
 
 	// Used to format the StatLines for printing
 	Formatter LineFormatter
@@ -158,8 +158,8 @@ func (cluster *AsyncClusterMonitor) updateHostInfo(stat StatLine) {
 
 // printSnapshot formats and dumps the current state of all the stats collected.
 func (cluster *AsyncClusterMonitor) printSnapshot(lineCount int, discover bool) {
-	cluster.mapLock.Lock()
-	defer cluster.mapLock.Unlock()
+	cluster.mapLock.RLock()
+	defer cluster.mapLock.RUnlock()
 	lines := make([]StatLine, 0, len(cluster.LastStatLines))
 	for _, stat := range cluster.LastStatLines {
 		lines = append(lines, *stat)
